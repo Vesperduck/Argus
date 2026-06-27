@@ -244,8 +244,8 @@ efficiency optimisation).
 | `DISCORD_SOURCE_CHANNEL_ID` | Channel to analyse for bug reports (alias: `DISCORD_CHANNEL_ID`) | — |
 | `DISCORD_REVIEW_CHANNEL_ID` | Channel to post proposals + summaries to | source channel |
 | `ANTHROPIC_API_KEY` | Claude API | — (secret) |
-| `GITHUB_TOKEN` | Issue search/create/comment | — (secret) |
-| `GITHUB_REPO` | `owner/repo` target | — |
+| `GITHUB_TOKEN` | Issue search/create/comment + state file | — (secret) |
+| `ARGUS_GITHUB_REPO` | `owner/repo` target (alias `GITHUB_REPO` locally) | — |
 | `STATE_GIST_ID` | Cursor + proposals storage (Gist backend) | — |
 | `ARGUS_MODEL` | Claude model | `claude-opus-4-8` |
 | `ARGUS_MAX_MESSAGES` | Per-run ingest cap | `500` |

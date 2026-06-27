@@ -65,7 +65,8 @@ cp .env.example .env   # then fill in the secrets
 ```
 
 Required env: `DISCORD_BOT_TOKEN`, `DISCORD_SOURCE_CHANNEL_ID` (channel to analyse; alias
-`DISCORD_CHANNEL_ID`), `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `GITHUB_REPO`. Optional:
+`DISCORD_CHANNEL_ID`), `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `ARGUS_GITHUB_REPO` (alias
+`GITHUB_REPO` locally). Optional:
 `DISCORD_REVIEW_CHANNEL_ID` (where proposals/summaries post; defaults to the source channel).
 See [.env.example](.env.example) for the full list and defaults.
 
@@ -93,7 +94,8 @@ the **Argus repo** under Settings → Secrets and variables → Actions:
   app's `GITHUB_TOKEN` env var.
 
 **Variables**
-- `GITHUB_REPO` — target repo, e.g. `owner/repo`
+- `ARGUS_GITHUB_REPO` — target repo, e.g. `owner/repo` (Actions forbids `GITHUB_`-prefixed
+  variable names, hence the `ARGUS_` prefix)
 - `DISCORD_SOURCE_CHANNEL_ID` — channel to analyse
 - `DISCORD_REVIEW_CHANNEL_ID` — optional; where proposals/summaries post (defaults to source)
 - Optional tuning (defaults apply if unset): `ARGUS_MODEL`, `ARGUS_REQUIRE_APPROVAL`,

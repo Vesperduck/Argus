@@ -34,7 +34,8 @@ jobs:
           # ARGUS_GH_TOKEN and mapped onto the env var the app reads.
           GITHUB_TOKEN: ${{ secrets.ARGUS_GH_TOKEN }}
           # --- Config (non-secret repository variables) ---
-          GITHUB_REPO: ${{ vars.GITHUB_REPO }}
+          # Named ARGUS_GITHUB_REPO because Actions forbids GITHUB_-prefixed var names.
+          ARGUS_GITHUB_REPO: ${{ vars.ARGUS_GITHUB_REPO }}
           DISCORD_SOURCE_CHANNEL_ID: ${{ vars.DISCORD_SOURCE_CHANNEL_ID }}
           DISCORD_REVIEW_CHANNEL_ID: ${{ vars.DISCORD_REVIEW_CHANNEL_ID }}
           ARGUS_MODEL: ${{ vars.ARGUS_MODEL }}

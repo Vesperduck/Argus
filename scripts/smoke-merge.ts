@@ -26,9 +26,11 @@ const discordToken = process.env.DISCORD_BOT_TOKEN;
 const channelId = process.env.DISCORD_CHANNEL_ID;
 const apiKey = process.env.ANTHROPIC_API_KEY;
 const githubToken = process.env.GITHUB_TOKEN;
-const repoSlug = process.env.GITHUB_REPO;
+const repoSlug = process.env.ARGUS_GITHUB_REPO ?? process.env.GITHUB_REPO;
 if (!discordToken || !channelId || !apiKey || !githubToken || !repoSlug) {
-  console.error('Need DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID, ANTHROPIC_API_KEY, GITHUB_TOKEN, GITHUB_REPO');
+  console.error(
+    'Need DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID, ANTHROPIC_API_KEY, GITHUB_TOKEN, ARGUS_GITHUB_REPO',
+  );
   process.exit(1);
 }
 const [owner, repo] = repoSlug.split('/') as [string, string];

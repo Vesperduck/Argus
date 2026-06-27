@@ -25,12 +25,10 @@ const EnvSchema = z.object({
   DISCORD_REVIEW_CHANNEL_ID: optional,
   ANTHROPIC_API_KEY: required('ANTHROPIC_API_KEY is required'),
   GITHUB_TOKEN: required('GITHUB_TOKEN is required'),
-  GITHUB_REPO: z.preprocess(
-    blankToUndef,
-    z
-      .string({ required_error: 'GITHUB_REPO is required' })
-      .regex(/^[^/\s]+\/[^/\s]+$/, 'GITHUB_REPO must be in "owner/repo" form'),
-  ),
+  // GitHub reserves the GITHUB_ prefix for Actions variable/secret names, so the
+  // canonical name is ARGUS_GITHUB_REPO. GITHUB_REPO stays as a local alias.
+  ARGUS_GITHUB_REPO: optional,
+  GITHUB_REPO: optional,
   ARGUS_STATE_PATH: optional,
   ARGUS_STATE_BRANCH: optional,
   ARGUS_MODEL: optional,
@@ -85,7 +83,12 @@ function parseApprovers(value: string | undefined): Approvers {
 
 export function loadConfig(): Config {
   const env = EnvSchema.parse(process.env);
-  const [owner, repo] = env.GITHUB_REPO.split('/') as [string, string];
+
+  const repoSlug = env.ARGUS_GITHUB_REPO ?? env.GITHUB_REPO;
+  if (!repoSlug || !/^[^/\s]+\/[^/\s]+$/.test(repoSlug)) {
+    throw new Error('ARGUS_GITHUB_REPO (or GITHUB_REPO) must be set to "owner/repo"');
+  }
+  const [owner, repo] = repoSlug.split('/') as [string, string];
 
   const sourceChannelId = env.DISCORD_SOURCE_CHANNEL_ID ?? env.DISCORD_CHANNEL_ID;
   if (!sourceChannelId) {

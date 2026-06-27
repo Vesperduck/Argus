@@ -10,9 +10,9 @@ import 'dotenv/config';
 import { Octokit } from '@octokit/rest';
 
 const token = process.env.GITHUB_TOKEN;
-const repoSlug = process.env.GITHUB_REPO;
+const repoSlug = process.env.ARGUS_GITHUB_REPO ?? process.env.GITHUB_REPO;
 if (!token || !repoSlug || !/^[^/\s]+\/[^/\s]+$/.test(repoSlug)) {
-  console.error('Need GITHUB_TOKEN and GITHUB_REPO ("owner/repo") in environment/.env');
+  console.error('Need GITHUB_TOKEN and ARGUS_GITHUB_REPO (or GITHUB_REPO) as "owner/repo"');
   process.exit(1);
 }
 const [owner, repo] = repoSlug.split('/') as [string, string];
