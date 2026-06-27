@@ -1,0 +1,48 @@
+name: argus
+
+on:
+  schedule:
+    # Daily at 08:00 UTC. Cron is always UTC — adjust for your timezone.
+    - cron: '0 8 * * *'
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+permissions:
+  contents: read # the app uses ARGUS_GH_TOKEN for cross-repo writes, not this
+
+concurrency:
+  group: argus
+  cancel-in-progress: false # never interrupt a run mid-write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Run Argus
+        run: npm start
+        env:
+          # --- Secrets ---
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # "GITHUB_TOKEN" is reserved by Actions, so the PAT is stored as
+          # ARGUS_GH_TOKEN and mapped onto the env var the app reads.
+          GITHUB_TOKEN: ${{ secrets.ARGUS_GH_TOKEN }}
+          # --- Config (non-secret repository variables) ---
+          GITHUB_REPO: ${{ vars.GITHUB_REPO }}
+          DISCORD_SOURCE_CHANNEL_ID: ${{ vars.DISCORD_SOURCE_CHANNEL_ID }}
+          DISCORD_REVIEW_CHANNEL_ID: ${{ vars.DISCORD_REVIEW_CHANNEL_ID }}
+          ARGUS_MODEL: ${{ vars.ARGUS_MODEL }}
+          ARGUS_REQUIRE_APPROVAL: ${{ vars.ARGUS_REQUIRE_APPROVAL }}
+          ARGUS_APPROVERS: ${{ vars.ARGUS_APPROVERS }}
+          ARGUS_PROPOSAL_TTL_HOURS: ${{ vars.ARGUS_PROPOSAL_TTL_HOURS }}
+          ARGUS_MAX_MESSAGES: ${{ vars.ARGUS_MAX_MESSAGES }}
+          ARGUS_SILENT_WHEN_EMPTY: ${{ vars.ARGUS_SILENT_WHEN_EMPTY }}
+          ARGUS_STATE_PATH: ${{ vars.ARGUS_STATE_PATH }}
+          ARGUS_STATE_BRANCH: ${{ vars.ARGUS_STATE_BRANCH }}
+          ARGUS_LOG_LEVEL: ${{ vars.ARGUS_LOG_LEVEL }}

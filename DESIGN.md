@@ -281,8 +281,9 @@ Each phase is independently runnable/testable; the orchestrator is wired last.
    reaction read-back live-testable now, full cross-run loop testable after phase 7. ✅
 7. **State store + orchestrator** — cursor + pending proposals persisted as a committed
    `.argus/state.json` (GitHub Contents API), end-to-end wiring. Code complete; live verification
-   pending the token's **Contents: read & write** grant. ◀ *current*
-8. **Scheduling** — GitHub Actions cron workflow; secrets; first live run.
+   pending the token's **Contents: read & write** grant. ✅
+8. **Scheduling** — GitHub Actions cron workflow (`argus.yml`) + repo secrets/variables; manual
+   `workflow_dispatch` for the first watermark-seeding run. ✅ ◀ *current*
 9. **Hardening** — forum-channel support, augment-pending-proposals, observability, cost tuning,
    failure alerting.
 

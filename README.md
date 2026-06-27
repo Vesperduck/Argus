@@ -8,11 +8,11 @@ See [DESIGN.md](DESIGN.md) for the full design.
 
 ## Status
 
-Phase 7 (state persistence) — **code complete; needs the token's Contents grant**. State
-(`{ cursor, pendingProposals }`) persists as a committed `.argus/state.json` in `GITHUB_REPO`
-via the Contents API. This closes the cross-run approval loop (propose one run, react, file on
-the next). Phases 1–6 are complete. Once the token has **Contents: read & write**, Argus runs
-end-to-end; only Phase 8 (scheduling) remains.
+Phase 8 (scheduling) — **implemented**. A daily GitHub Actions cron
+([`.github/workflows/argus.yml`](.github/workflows/argus.yml)) runs the full pipeline; see
+[Deployment](#deployment-scheduled-runs). All build phases (1–8) are now done — what remains is
+operational: set the repo secrets/variables and do a first manual run (which also requires the
+token's **Contents: read & write** grant for the state file).
 
 > **GitHub token now needs three things:** Issues: read & write, Contents: read & write, and
 > Metadata: read (fine-grained PAT), or the `repo` scope (classic). Verify with
@@ -78,6 +78,34 @@ See [.env.example](.env.example) for the full list and defaults.
 | `npm run typecheck` | `tsc --noEmit`. |
 | `npm run lint` | ESLint. |
 | `npm run build` / `npm start` | Compile to `dist/` and run the compiled output. |
+
+## Deployment (scheduled runs)
+
+Argus runs on a daily GitHub Actions cron ([`.github/workflows/argus.yml`](.github/workflows/argus.yml)),
+and can also be triggered manually from the Actions tab (`workflow_dispatch`). Configure these in
+the **Argus repo** under Settings → Secrets and variables → Actions:
+
+**Secrets**
+- `DISCORD_BOT_TOKEN`
+- `ANTHROPIC_API_KEY`
+- `ARGUS_GH_TOKEN` — the fine-grained PAT (Issues + Contents + Metadata) on the target repo.
+  Named this way because `GITHUB_TOKEN` is reserved by Actions; the workflow maps it onto the
+  app's `GITHUB_TOKEN` env var.
+
+**Variables**
+- `GITHUB_REPO` — target repo, e.g. `owner/repo`
+- `DISCORD_SOURCE_CHANNEL_ID` — channel to analyse
+- `DISCORD_REVIEW_CHANNEL_ID` — optional; where proposals/summaries post (defaults to source)
+- Optional tuning (defaults apply if unset): `ARGUS_MODEL`, `ARGUS_REQUIRE_APPROVAL`,
+  `ARGUS_APPROVERS`, `ARGUS_PROPOSAL_TTL_HOURS`, `ARGUS_MAX_MESSAGES`, `ARGUS_SILENT_WHEN_EMPTY`,
+  `ARGUS_STATE_PATH`, `ARGUS_STATE_BRANCH`, `ARGUS_LOG_LEVEL`
+
+**Notes**
+- Cron is **UTC** — adjust the schedule in the workflow for your timezone.
+- The **first run "watches from now"** (sets the state watermark, processes nothing); real work
+  starts on the next run. Trigger it once via `workflow_dispatch` to seed the watermark and
+  confirm secrets/variables are correct before relying on the schedule.
+- Day-2 onward: each run resolves yesterday's outstanding approvals, then ingests + proposes new.
 
 ## Security & secrets
 
