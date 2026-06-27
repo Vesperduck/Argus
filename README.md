@@ -79,6 +79,33 @@ See [.env.example](.env.example) for the full list and defaults.
 | `npm run lint` | ESLint. |
 | `npm run build` / `npm start` | Compile to `dist/` and run the compiled output. |
 
+## Security & secrets
+
+This is a public repo — **no secrets live in it**. All credentials are read from the environment
+(`.env` locally, which is gitignored; encrypted Actions secrets in CI). Controls in place:
+
+- **`.gitignore`** excludes `.env` / `.env.*` (except `.env.example`) and `.certs/`.
+- **CI secret scan** — [`.github/workflows/secret-scan.yml`](.github/workflows/secret-scan.yml)
+  runs [gitleaks](https://github.com/gitleaks/gitleaks) over the full history on every push/PR.
+- **CI build** — [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `npm ci`, typecheck,
+  and lint.
+- **Local pre-commit guard** ([`.githooks/pre-commit`](.githooks/pre-commit)) — blocks committing
+  a `.env` and runs gitleaks on staged changes. Enable it once per clone:
+
+  ```bash
+  git config core.hooksPath .githooks
+  # optional, so the hook is executable on Unix clones:
+  git update-index --chmod=+x .githooks/pre-commit
+  ```
+
+**When deploying (e.g. GitHub Actions, Phase 8):** put `DISCORD_BOT_TOKEN`, `ANTHROPIC_API_KEY`,
+and `GITHUB_TOKEN` in **encrypted repository secrets**, never in workflow YAML. Use least-privilege
+tokens (the GitHub PAT needs only Issues + Contents + Metadata, scoped to the one repo).
+
+**If a secret is ever exposed, rotate it immediately:** regenerate the Discord bot token, revoke
+the GitHub PAT, and roll the Anthropic API key — rotation is the only real fix, since anything
+pushed to a public repo must be assumed captured.
+
 ## Troubleshooting
 
 ### `npm install` fails with `UNABLE_TO_VERIFY_LEAF_SIGNATURE` / "Exit handler never called!"

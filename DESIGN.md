@@ -336,3 +336,29 @@ Sketch of how it'd work:
 Open questions: who may correct (reuse `ARGUS_APPROVERS`?), how to surface the revised draft
 clearly, and how corrections should read once the issue is filed (fold into the body vs. note
 as a comment).
+
+### 11.2 Suggestions / feature-request channel
+
+Extend Argus beyond bugs: watch a separate designated **suggestions** channel and turn community
+ideas into feature-request issues, using the same ingest → cluster → propose → approve → file
+pipeline.
+
+Sketch of how it'd work:
+- **Config:** a `DISCORD_SUGGESTIONS_CHANNEL_ID` (analysed like the source channel). Could be
+  generalised to a list of `{ channelId, kind: "bug" | "suggestion" }` feeds so more channel
+  types can be added later.
+- **Separate cursor per feed** in the state file (each channel tracks its own watermark), since
+  the channels advance independently.
+- **Distinct clustering prompt + schema** — a "suggestion report" (title, summary, motivation /
+  use case, proposed behaviour) rather than a bug report; the classifier keeps genuine feature
+  ideas and drops chatter, mirroring the bug prompt's precision-over-recall stance.
+- **GitHub:** file with an `enhancement`/`suggestion` label (vs. `argus`+`severity:*` for bugs);
+  the fingerprint-dedup and merge-judgement logic carry over unchanged.
+- **Reuse, don't fork:** the ingestion, proposal/approval, state, and sync modules are
+  feed-agnostic — only the per-feed prompt, schema, and labels differ. Aim to parameterise the
+  pipeline by "feed type" rather than duplicate it.
+- **Review output:** proposals can post to the same review channel, tagged by type (🐛 bug /
+  💡 suggestion), and the run summary groups by type.
+
+Open questions: should bugs and suggestions share one run (one schedule, both feeds) or run
+independently; and whether suggestions need the same approval gate or a lighter one.

@@ -1,7 +1,11 @@
 node_modules/
 dist/
 .certs/
+
+# Secrets / local env — never commit real env files
 .env
-.env.local
+.env.*
+!.env.example
+
 *.log
 .DS_Store

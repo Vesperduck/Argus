@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Local secret guard. Enable once per clone with:
+#   git config core.hooksPath .githooks
+set -euo pipefail
+
+staged="$(git diff --cached --name-only)"
+
+# 1) Never commit a real .env file (.env.example is fine).
+if echo "$staged" | grep -E '(^|/)\.env($|\.)' | grep -vE '\.env\.example$' >/dev/null; then
+  echo "✖ Refusing to commit a .env file — secrets must not be committed." >&2
+  exit 1
+fi
+
+# 2) Scan staged changes with gitleaks if it's installed.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --config .gitleaks.toml
+else
+  echo "ℹ gitleaks not installed — skipping local scan (CI still scans)." >&2
+  echo "  Install: https://github.com/gitleaks/gitleaks" >&2
+fi

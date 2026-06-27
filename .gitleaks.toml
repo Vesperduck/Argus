@@ -1,0 +1,15 @@
+title = "Argus gitleaks config"
+
+# Build on gitleaks' built-in rule set (Discord tokens, GitHub PATs,
+# Anthropic keys, generic high-entropy secrets, etc.).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Paths that never contain real secrets"
+paths = [
+  '''\.env\.example$''',
+  '''\.certs/''',
+  '''package-lock\.json$''',
+  '''\.gitleaks\.toml$''',
+]
