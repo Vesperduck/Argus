@@ -363,3 +363,27 @@ Sketch of how it'd work:
 
 Open questions: should bugs and suggestions share one run (one schedule, both feeds) or run
 independently; and whether suggestions need the same approval gate or a lighter one.
+
+### 11.3 Multiple source channels
+
+Today Argus analyses a single source channel. Allow **several** bug-report channels (e.g. one
+per platform, game mode, or community) to be watched in one run.
+
+Sketch of how it'd work:
+- **Config:** accept a list of source channels — e.g. `DISCORD_SOURCE_CHANNEL_IDS` as a
+  comma-separated list (keeping `DISCORD_SOURCE_CHANNEL_ID` as the single-channel shorthand).
+  This dovetails with §11.2's `{ channelId, kind }` feed-list idea — a source channel is just a
+  `kind: "bug"` feed, so both features likely share one "feeds" config.
+- **Per-channel cursor** in the state file (each channel advances independently — the state
+  already keys nothing to a single channel, so `cursor` becomes a map keyed by channel id).
+- **Ingestion** runs per channel (channel + its threads), tagging each `RawMessage` with its
+  origin channel so clustering and attribution can reference it.
+- **Clustering:** decide whether to cluster per channel (simpler; avoids cross-community
+  false merges) or across all channels (catches the same bug reported in two places). Likely
+  per channel for v1, with cross-channel dedup left to the fingerprint/merge layer.
+- **Proposals & issues:** include the originating channel in the proposal/issue body so
+  reviewers know where a report came from; everything still posts to the single review channel.
+
+Open questions: per-channel vs. global cursor migration from today's single cursor; whether
+each source channel can have its own review channel; and how to keep one run's cost/latency
+bounded as the channel count grows.

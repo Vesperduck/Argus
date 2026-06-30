@@ -15,6 +15,33 @@ export interface ReactionVerdict {
   rejectedBy: string[];
 }
 
+/** Reactions plus the channel the proposal message was actually found in. */
+export interface ResolvedReactions {
+  verdict: ReactionVerdict;
+  channelId: string;
+}
+
+/** Thrown when a proposal's message can't be found in any candidate channel. */
+export class ProposalMessageGoneError extends Error {}
+
+/** Discord error 10008 — the message id is unknown in the channel queried. */
+function isUnknownMessage(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === 10008;
+}
+
+/** Channels to look for a proposal message in, most-specific first, deduped. */
+function candidateChannels(config: Config, proposal: Proposal): string[] {
+  const out: string[] = [];
+  for (const c of [
+    proposal.channelId,
+    config.discord.reviewChannelId,
+    config.discord.sourceChannelId,
+  ]) {
+    if (c && !out.includes(c)) out.push(c);
+  }
+  return out;
+}
+
 function truncate(s: string, max = MAX_CONTENT): string {
   return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }
@@ -87,7 +114,7 @@ export async function postProposal(
   config: Config,
   bug: BugReport,
   action: ProposalAction,
-): Promise<{ discordMessageId: string }> {
+): Promise<{ discordMessageId: string; channelId: string }> {
   const mentions = bug.reporters.map((id) => `<@${id}>`).join(' ');
   const steps = bug.stepsToReproduce?.length
     ? `**Steps to reproduce:**\n${bug.stepsToReproduce.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
@@ -115,25 +142,46 @@ export async function postProposal(
   await seedReaction(rest, config.discord.reviewChannelId, msg.id, REJECT);
 
   logger.info(`posted proposal ${msg.id}`, { title: bug.title });
-  return { discordMessageId: msg.id };
+  return { discordMessageId: msg.id, channelId: config.discord.reviewChannelId };
 }
 
-/** Read the ✅/❌ reactions on a proposal message, excluding the bot's own seeds. */
+/**
+ * Read the ✅/❌ reactions on a proposal message, excluding the bot's own seeds.
+ * Tries the proposal's stored channel first, then the review and source channels
+ * (legacy proposals predate channel tracking, or the review channel may have
+ * changed). Returns the channel the message was actually found in so callers can
+ * edit it in place and backfill `proposal.channelId`.
+ *
+ * @throws {ProposalMessageGoneError} if the message is absent from all candidates.
+ */
 export async function readProposalReactions(
   rest: REST,
   config: Config,
   proposal: Proposal,
-): Promise<ReactionVerdict> {
+): Promise<ResolvedReactions> {
   const botId = await getBotUserId(rest);
-  const channelId = config.discord.reviewChannelId;
-  const [approve, reject] = await Promise.all([
-    reactorIds(rest, channelId, proposal.discordMessageId, APPROVE),
-    reactorIds(rest, channelId, proposal.discordMessageId, REJECT),
-  ]);
-  return {
-    approvedBy: approve.filter((id) => id !== botId),
-    rejectedBy: reject.filter((id) => id !== botId),
-  };
+  const channels = candidateChannels(config, proposal);
+  for (const channelId of channels) {
+    try {
+      const [approve, reject] = await Promise.all([
+        reactorIds(rest, channelId, proposal.discordMessageId, APPROVE),
+        reactorIds(rest, channelId, proposal.discordMessageId, REJECT),
+      ]);
+      return {
+        channelId,
+        verdict: {
+          approvedBy: approve.filter((id) => id !== botId),
+          rejectedBy: reject.filter((id) => id !== botId),
+        },
+      };
+    } catch (err) {
+      if (isUnknownMessage(err)) continue; // not in this channel — try the next
+      throw err;
+    }
+  }
+  throw new ProposalMessageGoneError(
+    `proposal message ${proposal.discordMessageId} not found in channel(s) ${channels.join(', ')}`,
+  );
 }
 
 /** Edit a resolved proposal message to reflect the outcome (no re-pings). */
@@ -142,9 +190,10 @@ export async function updateProposalMessage(
   config: Config,
   proposal: Proposal,
   note: string,
+  channelId: string = proposal.channelId ?? config.discord.reviewChannelId,
 ): Promise<void> {
   const content = truncate(`${note}\n~~${proposal.bug.title}~~`);
-  await rest.patch(Routes.channelMessage(config.discord.reviewChannelId, proposal.discordMessageId), {
+  await rest.patch(Routes.channelMessage(channelId, proposal.discordMessageId), {
     body: { content, allowed_mentions: { parse: [] } },
   });
 }

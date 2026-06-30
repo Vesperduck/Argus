@@ -53,6 +53,7 @@ export type ProposalState = 'pending' | 'approved' | 'rejected' | 'expired';
 export interface Proposal {
   id: string; // argus-internal uuid
   discordMessageId: string; // the proposal message posted in the channel
+  channelId?: string; // channel the proposal message lives in (optional for legacy state)
   bug: BugReport;
   action: ProposalAction;
   state: ProposalState;

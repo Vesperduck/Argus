@@ -23,6 +23,7 @@ const ProposalActionSchema = z.discriminatedUnion('kind', [
 const ProposalSchema = z.object({
   id: z.string(),
   discordMessageId: z.string(),
+  channelId: z.string().optional(),
   bug: BugReportSchema,
   action: ProposalActionSchema,
   state: z.enum(['pending', 'approved', 'rejected', 'expired']),

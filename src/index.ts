@@ -9,6 +9,7 @@ import {
   postProposal,
   postProposalsHeader,
   postRunSummary,
+  ProposalMessageGoneError,
   readProposalReactions,
   updateProposalMessage,
   type ReactionVerdict,
@@ -86,9 +87,10 @@ async function main(): Promise<void> {
   const stillPending: Proposal[] = [];
   for (const proposal of state.pendingProposals) {
     try {
-      const verdict = await readProposalReactions(discord, config, proposal);
+      const { verdict, channelId } = await readProposalReactions(discord, config, proposal);
+      proposal.channelId = channelId; // backfill / correct the stored channel
       const status = resolveProposal(verdict, proposal, config, Date.now());
-      logger.debug('resolve proposal', { id: proposal.id, status, verdict });
+      logger.debug('resolve proposal', { id: proposal.id, status, channelId, verdict });
 
       if (status === 'pending') {
         stillPending.push(proposal);
@@ -123,6 +125,13 @@ async function main(): Promise<void> {
         outcomes.push({ action: 'skipped', reason: 'expired', bug: proposal.bug });
       }
     } catch (err) {
+      if (err instanceof ProposalMessageGoneError) {
+        // The message was deleted (or is unreachable) — drop it rather than
+        // retrying forever, which would also block the cursor indefinitely.
+        logger.warn(`dropping proposal ${proposal.id}: ${err.message}`);
+        outcomes.push({ action: 'skipped', reason: 'message gone', bug: proposal.bug });
+        continue;
+      }
       const message = err instanceof Error ? err.message : String(err);
       logger.error(`failed resolving proposal ${proposal.id}`, message);
       outcomes.push({ action: 'failed', error: message, bug: proposal.bug });
@@ -188,10 +197,11 @@ async function main(): Promise<void> {
             await postProposalsHeader(discord, config);
             headerPosted = true;
           }
-          const { discordMessageId } = await postProposal(discord, config, bug, action);
+          const { discordMessageId, channelId } = await postProposal(discord, config, bug, action);
           const proposal: Proposal = {
             id: randomUUID(),
             discordMessageId,
+            channelId,
             bug,
             action,
             state: 'pending',
