@@ -26,7 +26,11 @@ const ProposalSchema = z.object({
   channelId: z.string().optional(),
   bug: BugReportSchema,
   action: ProposalActionSchema,
-  state: z.enum(['pending', 'approved', 'rejected', 'expired']),
+  // Tolerate unknown/legacy state values (e.g. hand-edited files) rather than
+  // failing the whole load — this field isn't used for control flow anyway
+  // (resolution is driven by reactions + TTL), so an unknown value is safe to
+  // treat as 'pending' and let the normal resolution path sort it out.
+  state: z.enum(['pending', 'approved', 'rejected', 'expired']).catch('pending'),
   proposedAt: z.string(),
 });
 

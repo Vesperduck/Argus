@@ -103,6 +103,20 @@ async function main(): Promise<void> {
       }
 
       if (status === 'approved') {
+        // Idempotency guard: if an Argus issue already covers these source
+        // messages, don't file again (protects against stale state / re-runs).
+        const covered = await findIssueCoveringSources(github, config, proposal.bug);
+        if (covered) {
+          logger.info(`proposal ${proposal.id} already filed (#${covered.number}) — skipping`);
+          await updateProposalMessage(discord, config, proposal, `✅ Already filed: ${covered.url}`);
+          outcomes.push({
+            action: 'skipped',
+            reason: `already filed (#${covered.number})`,
+            bug: proposal.bug,
+          });
+          continue;
+        }
+
         let issue: IssueRef;
         let act: 'created' | 'updated';
         if (proposal.action.kind === 'create') {
