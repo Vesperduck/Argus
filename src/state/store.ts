@@ -34,15 +34,40 @@ const ProposalSchema = z.object({
   proposedAt: z.string(),
 });
 
+const CursorSchema = z.object({
+  lastMessageId: z.string().optional(),
+  lastRunAt: z.string().optional(),
+});
+
 const StateSchema = z.object({
-  cursor: z.object({
-    lastMessageId: z.string().optional(),
-    lastRunAt: z.string().optional(),
-  }),
+  // Legacy single-channel cursor (pre-multi-channel state files). Migrated to
+  // `cursors` on load, keyed by the first configured source channel.
+  cursor: CursorSchema.optional(),
+  cursors: z.record(CursorSchema).optional(),
   pendingProposals: z.array(ProposalSchema),
 });
 
-const EMPTY_STATE: ArgusState = { cursor: {}, pendingProposals: [] };
+const EMPTY_STATE: ArgusState = { cursors: {}, pendingProposals: [] };
+
+/**
+ * Normalise a parsed state file to the current shape. A legacy top-level
+ * `cursor` belonged to the (then single) source channel, so it becomes the
+ * cursor of the first configured channel unless that channel already has one.
+ * Channels appearing in config for the first time simply have no cursor and
+ * bootstrap a fresh watermark on their first ingest.
+ */
+function migrate(parsed: z.infer<typeof StateSchema>, config: Config): ArgusState {
+  const cursors = { ...(parsed.cursors ?? {}) };
+  const primary = config.discord.sourceChannelIds[0];
+  if (parsed.cursor?.lastMessageId && primary && !cursors[primary]) {
+    cursors[primary] = parsed.cursor;
+    logger.info('migrated legacy single cursor to per-channel cursors', {
+      channelId: primary,
+      lastMessageId: parsed.cursor.lastMessageId,
+    });
+  }
+  return { cursors, pendingProposals: parsed.pendingProposals };
+}
 
 /** The blob sha of the last-read state file, needed to update it. */
 let cachedSha: string | undefined;
@@ -87,12 +112,14 @@ export async function loadState(octokit: Octokit, config: Config): Promise<Argus
     }
     cachedSha = data.sha;
     const json = Buffer.from(data.content, 'base64').toString('utf8');
-    const parsed = StateSchema.parse(JSON.parse(json));
+    const state = migrate(StateSchema.parse(JSON.parse(json)), config);
     logger.info('loaded state', {
-      cursor: parsed.cursor.lastMessageId ?? '(none)',
-      pending: parsed.pendingProposals.length,
+      cursors: Object.fromEntries(
+        Object.entries(state.cursors).map(([id, c]) => [id, c.lastMessageId ?? '(none)']),
+      ),
+      pending: state.pendingProposals.length,
     });
-    return parsed;
+    return state;
   } catch (err) {
     if (hasStatus(err, 404)) {
       logger.info('no existing state file — starting fresh');

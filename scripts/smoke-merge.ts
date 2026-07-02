@@ -45,7 +45,7 @@ const rest = new REST({ version: '10' }).setToken(discordToken);
 const client = new Anthropic({ apiKey });
 const octokit = new Octokit({ auth: githubToken });
 const config = {
-  discord: { sourceChannelId: channelId },
+  discord: { sourceChannelIds: [channelId] },
   anthropic: { apiKey, model },
   github: { token: githubToken, owner, repo },
   behavior: { maxMessages },
@@ -54,7 +54,7 @@ const config = {
 resetUsage();
 console.log(`Last ${hours}h -> cluster -> match against ${owner}/${repo} (no writes)\n`);
 
-const ingest = await fetchNewMessages(rest, config, { lastMessageId: cursor });
+const ingest = await fetchNewMessages(rest, config, channelId, { lastMessageId: cursor });
 console.log(`ingested ${ingest.messages.length} message(s)`);
 
 const bugs = await clusterMessages(client, config, ingest.messages);

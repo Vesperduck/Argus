@@ -64,10 +64,10 @@ npm install
 cp .env.example .env   # then fill in the secrets
 ```
 
-Required env: `DISCORD_BOT_TOKEN`, `DISCORD_SOURCE_CHANNEL_ID` (channel to analyse; alias
-`DISCORD_CHANNEL_ID`), `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `ARGUS_GITHUB_REPO` (alias
-`GITHUB_REPO` locally). Optional:
-`DISCORD_REVIEW_CHANNEL_ID` (where proposals/summaries post; defaults to the source channel).
+Required env: `DISCORD_BOT_TOKEN`, `DISCORD_SOURCE_CHANNEL_IDS` (comma-separated channels to
+analyse; single-channel shorthand `DISCORD_SOURCE_CHANNEL_ID`, legacy alias `DISCORD_CHANNEL_ID`),
+`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `ARGUS_GITHUB_REPO` (alias `GITHUB_REPO` locally). Optional:
+`DISCORD_REVIEW_CHANNEL_ID` (where proposals/summaries post; defaults to the first source channel).
 See [.env.example](.env.example) for the full list and defaults.
 
 ## Scripts
@@ -96,8 +96,10 @@ the **Argus repo** under Settings → Secrets and variables → Actions:
 **Variables**
 - `ARGUS_GITHUB_REPO` — target repo, e.g. `owner/repo` (Actions forbids `GITHUB_`-prefixed
   variable names, hence the `ARGUS_` prefix)
-- `DISCORD_SOURCE_CHANNEL_ID` — channel to analyse
-- `DISCORD_REVIEW_CHANNEL_ID` — optional; where proposals/summaries post (defaults to source)
+- `DISCORD_SOURCE_CHANNEL_IDS` — comma-separated channels to analyse (or
+  `DISCORD_SOURCE_CHANNEL_ID` for a single channel)
+- `DISCORD_REVIEW_CHANNEL_ID` — optional; where proposals/summaries post (defaults to the first
+  source channel)
 - Optional tuning (defaults apply if unset): `ARGUS_MODEL`, `ARGUS_REQUIRE_APPROVAL`,
   `ARGUS_APPROVERS`, `ARGUS_PROPOSAL_TTL_HOURS`, `ARGUS_MAX_MESSAGES`, `ARGUS_SILENT_WHEN_EMPTY`,
   `ARGUS_STATE_PATH`, `ARGUS_STATE_BRANCH`, `ARGUS_LOG_LEVEL`

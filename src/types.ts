@@ -50,6 +50,9 @@ export interface BugReport {
   // The verbatim messages behind those ids, for developer context on resolution.
   sourceMessages: SourceMessage[];
   reporters: string[]; // Discord user IDs
+  // Enriched by the orchestrator (not the model): the source channel the bug's
+  // messages came from. Optional for legacy state written before multi-channel.
+  sourceChannelId?: string;
 }
 
 /** Claude's decision on whether a bug matches an existing issue. */
@@ -83,7 +86,8 @@ export interface Cursor {
 
 /** The full durable state persisted between runs. */
 export interface ArgusState {
-  cursor: Cursor;
+  /** Per-source-channel cursors, keyed by channel id. */
+  cursors: Record<string, Cursor>;
   pendingProposals: Proposal[];
 }
 

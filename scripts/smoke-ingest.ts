@@ -34,15 +34,15 @@ const cursor = ((sinceMs - DISCORD_EPOCH) << 22n).toString();
 
 const rest = new REST({ version: '10' }).setToken(token);
 
-// fetchNewMessages only reads config.discord.channelId and behavior.maxMessages.
+// fetchNewMessages only reads behavior.maxMessages from config.
 const config = {
-  discord: { sourceChannelId: channelId },
+  discord: { sourceChannelIds: [channelId] },
   behavior: { maxMessages },
 } as unknown as Config;
 
 console.log(`Smoke test: messages from the last ${hours}h (seeded cursor ${cursor})\n`);
 
-const result = await fetchNewMessages(rest, config, { lastMessageId: cursor });
+const result = await fetchNewMessages(rest, config, channelId, { lastMessageId: cursor });
 
 console.log(`\nfetched ${result.messages.length} message(s); newCursor=${result.newCursor}`);
 for (const m of result.messages) {

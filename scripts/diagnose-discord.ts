@@ -11,11 +11,25 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 const token = process.env.DISCORD_BOT_TOKEN;
-const sourceChannelId = process.env.DISCORD_SOURCE_CHANNEL_ID ?? process.env.DISCORD_CHANNEL_ID;
-const reviewChannelId = process.env.DISCORD_REVIEW_CHANNEL_ID ?? sourceChannelId;
+const sourceChannelIds = [
+  ...new Set(
+    (
+      process.env.DISCORD_SOURCE_CHANNEL_IDS ??
+      process.env.DISCORD_SOURCE_CHANNEL_ID ??
+      process.env.DISCORD_CHANNEL_ID ??
+      ''
+    )
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  ),
+];
+const reviewChannelId = process.env.DISCORD_REVIEW_CHANNEL_ID ?? sourceChannelIds[0];
 
-if (!token || !sourceChannelId) {
-  console.error('Missing DISCORD_BOT_TOKEN or DISCORD_SOURCE_CHANNEL_ID/DISCORD_CHANNEL_ID in .env');
+if (!token || sourceChannelIds.length === 0) {
+  console.error(
+    'Missing DISCORD_BOT_TOKEN or DISCORD_SOURCE_CHANNEL_IDS/DISCORD_SOURCE_CHANNEL_ID/DISCORD_CHANNEL_ID in .env',
+  );
   process.exit(1);
 }
 
@@ -70,8 +84,10 @@ async function checkChannel(channelId: string, role: string, needsPost: boolean)
   }
 }
 
-await checkChannel(sourceChannelId, 'source', false);
-if (reviewChannelId && reviewChannelId !== sourceChannelId) {
+for (const id of sourceChannelIds) {
+  await checkChannel(id, 'source', false);
+}
+if (reviewChannelId && !sourceChannelIds.includes(reviewChannelId)) {
   await checkChannel(reviewChannelId, 'review', true);
 } else {
   console.log('[info] review channel == source channel; it also needs Send Messages + Add Reactions.');

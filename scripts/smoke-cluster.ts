@@ -35,7 +35,7 @@ const cursor = ((sinceMs - DISCORD_EPOCH) << 22n).toString();
 
 const rest = new REST({ version: '10' }).setToken(token);
 const config = {
-  discord: { sourceChannelId: channelId },
+  discord: { sourceChannelIds: [channelId] },
   anthropic: { apiKey, model },
   behavior: { maxMessages },
 } as unknown as Config;
@@ -43,7 +43,7 @@ const config = {
 resetUsage();
 console.log(`Fetching last ${hours}h, clustering with ${model}...\n`);
 
-const ingest = await fetchNewMessages(rest, config, { lastMessageId: cursor });
+const ingest = await fetchNewMessages(rest, config, channelId, { lastMessageId: cursor });
 console.log(`ingested ${ingest.messages.length} message(s)\n`);
 
 const client = new Anthropic({ apiKey });

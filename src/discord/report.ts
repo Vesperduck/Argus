@@ -35,7 +35,7 @@ function candidateChannels(config: Config, proposal: Proposal): string[] {
   for (const c of [
     proposal.channelId,
     config.discord.reviewChannelId,
-    config.discord.sourceChannelId,
+    ...config.discord.sourceChannelIds,
   ]) {
     if (c && !out.includes(c)) out.push(c);
   }
@@ -127,11 +127,17 @@ export async function postProposal(
         700,
       )}`
     : '';
+  // Say where the report came from when several channels are being watched.
+  const origin =
+    bug.sourceChannelId && config.discord.sourceChannelIds.length > 1
+      ? `**From:** <#${bug.sourceChannelId}>`
+      : '';
   const content = truncate(
     [
       `🐛 **Proposed bug report** — \`${bug.severity}\``,
       `**${bug.title}**`,
       bug.summary,
+      origin,
       steps,
       sources,
       actionLine(action),

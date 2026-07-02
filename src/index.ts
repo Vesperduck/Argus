@@ -154,104 +154,135 @@ async function main(): Promise<void> {
   }
   state.pendingProposals = stillPending;
 
-  // --- Phase B: ingest + cluster ------------------------------------------
-  const ingest = await fetchNewMessages(discord, config, state.cursor);
-  logger.info(`fetched ${ingest.messages.length} new message(s)`);
-  logger.debug(
-    'ingested',
-    ingest.messages.map((m) => ({
-      id: m.id,
-      author: m.authorName,
-      thread: m.threadId ?? null,
-      at: m.createdAt,
-      preview: m.content.slice(0, 80),
-    })),
-  );
+  // --- Phase B: ingest + cluster, per source channel -----------------------
+  // Each channel has its own cursor and is clustered separately (avoids
+  // cross-community false merges); cross-channel dedup is handled by the
+  // fingerprint/pending layers. A failure in one channel doesn't stop the
+  // others, and only blocks that channel's cursor.
+  // Post the review header once per run, lazily, before the first proposal.
+  let headerPosted = false;
+  const channelResults = new Map<string, { newCursor?: string; failed: boolean }>();
 
-  if (ingest.messages.length > 0) {
-    const bugs = await clusterMessages(anthropic, config, ingest.messages);
-    logger.info(`clustered into ${bugs.length} bug(s)`);
-
-    // --- Phase C: per-bug decision ----------------------------------------
-    // Post the review header once, lazily, before the first proposal.
-    let headerPosted = false;
-    for (const bug of bugs) {
-      try {
-        // Dedup: skip bugs already covered by an open proposal or a filed issue.
-        if (overlapsPending(state.pendingProposals, bug)) {
-          logger.info(`skipping already-proposed bug: ${bug.title}`);
-          outcomes.push({ action: 'skipped', reason: 'already proposed', bug });
-          continue;
-        }
-        const covered = await findIssueCoveringSources(github, config, bug);
-        if (covered) {
-          logger.info(`skipping already-filed bug (#${covered.number}): ${bug.title}`);
-          outcomes.push({ action: 'skipped', reason: `already filed (#${covered.number})`, bug });
-          continue;
-        }
-
-        const candidates = await findCandidateIssues(github, config, bug);
-        const decision = await judgeMatch(anthropic, config, bug, candidates);
-        const wantsMerge = decision.issueNumber !== null;
-        const action: ProposalAction = wantsMerge
-          ? {
-              kind: 'merge',
-              issueNumber: decision.issueNumber as number,
-              newInformation: decision.newInformation,
-            }
-          : { kind: 'create' };
-
-        if (config.behavior.requireApproval) {
-          if (args.dryRun) {
-            logger.info(`[dry-run] would propose: ${bug.title}`);
-            outcomes.push({ action: 'skipped', reason: 'dry-run', bug });
-            continue;
-          }
-          if (!headerPosted) {
-            await postProposalsHeader(discord, config);
-            headerPosted = true;
-          }
-          const { discordMessageId, channelId } = await postProposal(discord, config, bug, action);
-          const proposal: Proposal = {
-            id: randomUUID(),
-            discordMessageId,
-            channelId,
-            bug,
-            action,
-            state: 'pending',
-            proposedAt: new Date().toISOString(),
-          };
-          state.pendingProposals.push(proposal);
-          outcomes.push({ action: 'proposed', proposal });
-        } else {
-          if (args.dryRun) {
-            logger.info(`[dry-run] would ${wantsMerge ? 'update' : 'create'} issue: ${bug.title}`);
-            outcomes.push({ action: 'skipped', reason: 'dry-run', bug });
-            continue;
-          }
-          const issue = wantsMerge
-            ? await mergeIntoIssue(github, config, bug, decision)
-            : await createIssue(github, config, bug);
-          outcomes.push({ action: wantsMerge ? 'updated' : 'created', issue, bug });
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.error(`failed handling bug "${bug.title}"`, message);
-        outcomes.push({ action: 'failed', error: message, bug });
+  for (const channelId of config.discord.sourceChannelIds) {
+    const result = { newCursor: undefined as string | undefined, failed: false };
+    channelResults.set(channelId, result);
+    try {
+      const ingest = await fetchNewMessages(discord, config, channelId, state.cursors[channelId] ?? {});
+      result.newCursor = ingest.newCursor;
+      logger.info(`fetched ${ingest.messages.length} new message(s)`, { channelId });
+      logger.debug(
+        'ingested',
+        ingest.messages.map((m) => ({
+          id: m.id,
+          author: m.authorName,
+          thread: m.threadId ?? null,
+          at: m.createdAt,
+          preview: m.content.slice(0, 80),
+        })),
+      );
+      if (ingest.messages.length === 0) {
+        logger.info('no new messages this run', { channelId });
+        continue;
       }
+
+      const bugs = await clusterMessages(anthropic, config, ingest.messages);
+      logger.info(`clustered into ${bugs.length} bug(s)`, { channelId });
+      for (const bug of bugs) bug.sourceChannelId = channelId;
+
+      // --- Phase C: per-bug decision --------------------------------------
+      for (const bug of bugs) {
+        try {
+          // Dedup: skip bugs already covered by an open proposal or a filed issue.
+          if (overlapsPending(state.pendingProposals, bug)) {
+            logger.info(`skipping already-proposed bug: ${bug.title}`);
+            outcomes.push({ action: 'skipped', reason: 'already proposed', bug });
+            continue;
+          }
+          const covered = await findIssueCoveringSources(github, config, bug);
+          if (covered) {
+            logger.info(`skipping already-filed bug (#${covered.number}): ${bug.title}`);
+            outcomes.push({ action: 'skipped', reason: `already filed (#${covered.number})`, bug });
+            continue;
+          }
+  
+          const candidates = await findCandidateIssues(github, config, bug);
+          const decision = await judgeMatch(anthropic, config, bug, candidates);
+          const wantsMerge = decision.issueNumber !== null;
+          const action: ProposalAction = wantsMerge
+            ? {
+                kind: 'merge',
+                issueNumber: decision.issueNumber as number,
+                newInformation: decision.newInformation,
+              }
+            : { kind: 'create' };
+  
+          if (config.behavior.requireApproval) {
+            if (args.dryRun) {
+              logger.info(`[dry-run] would propose: ${bug.title}`);
+              outcomes.push({ action: 'skipped', reason: 'dry-run', bug });
+              continue;
+            }
+            if (!headerPosted) {
+              await postProposalsHeader(discord, config);
+              headerPosted = true;
+            }
+            const { discordMessageId, channelId: proposalChannelId } = await postProposal(
+              discord,
+              config,
+              bug,
+              action,
+            );
+            const proposal: Proposal = {
+              id: randomUUID(),
+              discordMessageId,
+              channelId: proposalChannelId,
+              bug,
+              action,
+              state: 'pending',
+              proposedAt: new Date().toISOString(),
+            };
+            state.pendingProposals.push(proposal);
+            outcomes.push({ action: 'proposed', proposal });
+          } else {
+            if (args.dryRun) {
+              logger.info(`[dry-run] would ${wantsMerge ? 'update' : 'create'} issue: ${bug.title}`);
+              outcomes.push({ action: 'skipped', reason: 'dry-run', bug });
+              continue;
+            }
+            const issue = wantsMerge
+              ? await mergeIntoIssue(github, config, bug, decision)
+              : await createIssue(github, config, bug);
+            outcomes.push({ action: wantsMerge ? 'updated' : 'created', issue, bug });
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          logger.error(`failed handling bug "${bug.title}"`, message);
+          outcomes.push({ action: 'failed', error: message, bug });
+          result.failed = true;
+        }
+      }
+    } catch (err) {
+      // Channel-level failure (ingest or clustering) — record it, block this
+      // channel's cursor, and carry on with the remaining channels.
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error(`failed processing channel ${channelId}`, message);
+      result.failed = true;
     }
-  } else {
-    logger.info('no new messages this run');
   }
 
-  // --- Finish: report + advance cursor ------------------------------------
+  // --- Finish: report + advance cursors ------------------------------------
   await emitSummary();
 
-  const allHandled = !outcomes.some((o) => o.action === 'failed');
-  if (allHandled && ingest.newCursor) {
-    state.cursor = { lastMessageId: ingest.newCursor, lastRunAt: new Date().toISOString() };
-  } else if (!allHandled) {
-    logger.warn('not advancing cursor (failures present)');
+  // Advance each channel's cursor only if that channel's bugs were all handled
+  // without error; a failed channel re-reads the same window next run (the
+  // fingerprint + pending layers absorb the overlap).
+  const now = new Date().toISOString();
+  for (const [channelId, result] of channelResults) {
+    if (result.failed) {
+      logger.warn('not advancing cursor (failures present)', { channelId });
+    } else if (result.newCursor) {
+      state.cursors[channelId] = { lastMessageId: result.newCursor, lastRunAt: now };
+    }
   }
 
   await persist();

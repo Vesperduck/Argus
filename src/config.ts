@@ -18,10 +18,12 @@ const optional = z.preprocess(blankToUndef, z.string().optional());
 
 const EnvSchema = z.object({
   DISCORD_BOT_TOKEN: required('DISCORD_BOT_TOKEN is required'),
-  // Source = channel to analyse; review = channel to post proposals/summaries to.
-  // DISCORD_CHANNEL_ID is a backward-compatible alias for the source channel.
+  // Source = channel(s) to analyse; review = channel to post proposals/summaries to.
+  // DISCORD_SOURCE_CHANNEL_IDS is a comma-separated list; DISCORD_SOURCE_CHANNEL_ID
+  // is the single-channel shorthand, and DISCORD_CHANNEL_ID a legacy alias for it.
   DISCORD_CHANNEL_ID: optional,
   DISCORD_SOURCE_CHANNEL_ID: optional,
+  DISCORD_SOURCE_CHANNEL_IDS: optional,
   DISCORD_REVIEW_CHANNEL_ID: optional,
   ANTHROPIC_API_KEY: required('ANTHROPIC_API_KEY is required'),
   GITHUB_TOKEN: required('GITHUB_TOKEN is required'),
@@ -42,7 +44,7 @@ const EnvSchema = z.object({
 export type Approvers = 'reporters' | 'anyone' | { userIds: string[] };
 
 export interface Config {
-  discord: { token: string; sourceChannelId: string; reviewChannelId: string };
+  discord: { token: string; sourceChannelIds: string[]; reviewChannelId: string };
   anthropic: { apiKey: string; model: string };
   github: { token: string; owner: string; repo: string };
   state: { path: string; branch?: string };
@@ -90,14 +92,26 @@ export function loadConfig(): Config {
   }
   const [owner, repo] = repoSlug.split('/') as [string, string];
 
-  const sourceChannelId = env.DISCORD_SOURCE_CHANNEL_ID ?? env.DISCORD_CHANNEL_ID;
-  if (!sourceChannelId) {
-    throw new Error('DISCORD_SOURCE_CHANNEL_ID (or DISCORD_CHANNEL_ID) is required');
+  // List form wins; fall back to the single-channel shorthand / legacy alias.
+  const rawChannels =
+    env.DISCORD_SOURCE_CHANNEL_IDS ?? env.DISCORD_SOURCE_CHANNEL_ID ?? env.DISCORD_CHANNEL_ID;
+  const sourceChannelIds = [
+    ...new Set(
+      (rawChannels ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (sourceChannelIds.length === 0) {
+    throw new Error(
+      'DISCORD_SOURCE_CHANNEL_IDS (or DISCORD_SOURCE_CHANNEL_ID / DISCORD_CHANNEL_ID) is required',
+    );
   }
-  const reviewChannelId = env.DISCORD_REVIEW_CHANNEL_ID ?? sourceChannelId;
+  const reviewChannelId = env.DISCORD_REVIEW_CHANNEL_ID ?? (sourceChannelIds[0] as string);
 
   return {
-    discord: { token: env.DISCORD_BOT_TOKEN, sourceChannelId, reviewChannelId },
+    discord: { token: env.DISCORD_BOT_TOKEN, sourceChannelIds, reviewChannelId },
     anthropic: { apiKey: env.ANTHROPIC_API_KEY, model: env.ARGUS_MODEL ?? 'claude-opus-4-8' },
     github: { token: env.GITHUB_TOKEN, owner, repo },
     state: {

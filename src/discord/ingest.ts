@@ -146,23 +146,27 @@ async function collectThreadSources(
 }
 
 /**
- * Fetch new messages from the bug channel and its threads since the cursor.
+ * Fetch new messages from one source channel and its threads since that
+ * channel's cursor.
  *
- * - No cursor (first run): set the watermark to the channel's latest message and
- *   process nothing — Argus "watches from now" rather than backfilling history.
+ * - No cursor (first run for this channel): set the watermark to the channel's
+ *   latest message and process nothing — Argus "watches from now" rather than
+ *   backfilling history.
  * - Otherwise: page the main channel + threads after the cursor, merge, sort by
  *   snowflake, and cap at `maxMessages` (keeping the oldest, carrying overflow).
  */
 export async function fetchNewMessages(
   rest: REST,
   config: Config,
+  channelId: string,
   cursor: Cursor,
 ): Promise<IngestResult> {
-  const channelId = config.discord.sourceChannelId;
-
   if (!cursor.lastMessageId) {
     const watermark = await latestMessageId(rest, channelId);
-    logger.info('first run — establishing watermark, no history processed', { watermark });
+    logger.info('first run for channel — establishing watermark, no history processed', {
+      channelId,
+      watermark,
+    });
     return { messages: [], newCursor: watermark };
   }
 
@@ -170,6 +174,7 @@ export async function fetchNewMessages(
   const sources: MessageSource[] = [{ id: channelId }];
   sources.push(...(await collectThreadSources(rest, channelId, after)));
   logger.debug(`ingesting from ${sources.length} source(s)`, {
+    channelId,
     threads: sources.length - 1,
   });
 

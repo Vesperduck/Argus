@@ -35,6 +35,8 @@ export const BugReportSchema = z.object({
   // parse cleanly.
   sourceMessages: z.array(SourceMessageSchema).default([]),
   reporters: z.array(z.string()),
+  // Also orchestrator-enriched: the source channel the messages came from.
+  sourceChannelId: z.string().optional(),
 });
 
 export const BugListSchema = z.object({

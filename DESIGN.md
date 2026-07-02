@@ -4,11 +4,14 @@
 > bug-reports channel, distils the chatter into structured bug reports with Claude, proposes
 > them to the reporters for confirmation, and keeps a GitHub issue tracker in sync.
 
-**Status:** Draft v0.2
+**Status:** Draft v0.3
 **Stack:** TypeScript (Node.js) · `@discordjs/rest` + `discord-api-types` · `@anthropic-ai/sdk` · Octokit
 **Execution model:** Stateless scheduled job (serverless / external cron)
 
 **Changelog**
+- v0.3 — Implemented **multiple source channels** (was backlog §11.3):
+  `DISCORD_SOURCE_CHANNEL_IDS` list, per-channel cursors (with migration from the legacy single
+  cursor), per-channel ingest + clustering, channel attribution on proposals/issues.
 - v0.2 — Added human-in-the-loop **approval workflow** (reaction-based, polled across runs) and
   **thread ingestion** within the text channel. Resolved §10 questions 1 & 5.
 - v0.1 — Initial design.
@@ -249,8 +252,9 @@ efficiency optimisation).
 | Name | Purpose | Default |
 |---|---|---|
 | `DISCORD_BOT_TOKEN` | Read history, post, read reactions | — (secret) |
-| `DISCORD_SOURCE_CHANNEL_ID` | Channel to analyse for bug reports (alias: `DISCORD_CHANNEL_ID`) | — |
-| `DISCORD_REVIEW_CHANNEL_ID` | Channel to post proposals + summaries to | source channel |
+| `DISCORD_SOURCE_CHANNEL_IDS` | Comma-separated channels to analyse for bug reports | — |
+| `DISCORD_SOURCE_CHANNEL_ID` | Single-channel shorthand (alias: `DISCORD_CHANNEL_ID`) | — |
+| `DISCORD_REVIEW_CHANNEL_ID` | Channel to post proposals + summaries to | first source channel |
 | `ANTHROPIC_API_KEY` | Claude API | — (secret) |
 | `GITHUB_TOKEN` | Issue search/create/comment + state file | — (secret) |
 | `ARGUS_GITHUB_REPO` | `owner/repo` target (alias `GITHUB_REPO` locally) | — |
@@ -372,26 +376,30 @@ Sketch of how it'd work:
 Open questions: should bugs and suggestions share one run (one schedule, both feeds) or run
 independently; and whether suggestions need the same approval gate or a lighter one.
 
-### 11.3 Multiple source channels
+### 11.3 Multiple source channels — ✅ implemented (v0.3)
 
-Today Argus analyses a single source channel. Allow **several** bug-report channels (e.g. one
-per platform, game mode, or community) to be watched in one run.
+Argus can watch **several** bug-report channels (e.g. one per platform, game mode, or
+community) in one run.
 
-Sketch of how it'd work:
-- **Config:** accept a list of source channels — e.g. `DISCORD_SOURCE_CHANNEL_IDS` as a
-  comma-separated list (keeping `DISCORD_SOURCE_CHANNEL_ID` as the single-channel shorthand).
-  This dovetails with §11.2's `{ channelId, kind }` feed-list idea — a source channel is just a
-  `kind: "bug"` feed, so both features likely share one "feeds" config.
-- **Per-channel cursor** in the state file (each channel advances independently — the state
-  already keys nothing to a single channel, so `cursor` becomes a map keyed by channel id).
-- **Ingestion** runs per channel (channel + its threads), tagging each `RawMessage` with its
-  origin channel so clustering and attribution can reference it.
-- **Clustering:** decide whether to cluster per channel (simpler; avoids cross-community
-  false merges) or across all channels (catches the same bug reported in two places). Likely
-  per channel for v1, with cross-channel dedup left to the fingerprint/merge layer.
-- **Proposals & issues:** include the originating channel in the proposal/issue body so
-  reviewers know where a report came from; everything still posts to the single review channel.
+How it works:
+- **Config:** `DISCORD_SOURCE_CHANNEL_IDS` — a comma-separated list
+  (`DISCORD_SOURCE_CHANNEL_ID` remains the single-channel shorthand, `DISCORD_CHANNEL_ID` the
+  legacy alias). The review channel defaults to the **first** source channel. This dovetails
+  with §11.2's `{ channelId, kind }` feed-list idea — a source channel is just a `kind: "bug"`
+  feed, so both features can later share one "feeds" config.
+- **Per-channel cursor** in the state file: `cursor` became `cursors`, a map keyed by channel
+  id. A legacy single `cursor` is migrated on load to the first configured channel; channels
+  added later simply bootstrap a fresh "watch from now" watermark on their first ingest.
+- **Ingestion** runs per channel (channel + its threads).
+- **Clustering** runs per channel (avoids cross-community false merges); cross-channel dedup is
+  left to the fingerprint/merge layer, which is channel-agnostic.
+- **Proposals & issues** carry the originating channel (`bug.sourceChannelId`, enriched by the
+  orchestrator): the proposal card shows a `From: #channel` line when more than one channel is
+  watched, and the issue body records the source channel id. Everything still posts to the
+  single review channel.
+- **Failure isolation:** a failure in one channel doesn't stop the others, and only blocks
+  *that* channel's cursor from advancing.
 
-Open questions: per-channel vs. global cursor migration from today's single cursor; whether
-each source channel can have its own review channel; and how to keep one run's cost/latency
-bounded as the channel count grows.
+Remaining open questions: whether each source channel can have its own review channel, and how
+to keep one run's cost/latency bounded as the channel count grows (`ARGUS_MAX_MESSAGES` is
+currently a per-channel cap).

@@ -69,6 +69,7 @@ function renderIssueBody(bug: BugReport): string {
   parts.push('');
   parts.push(`**Severity:** ${bug.severity}`);
   if (bug.area) parts.push(`**Area:** ${bug.area}`);
+  if (bug.sourceChannelId) parts.push(`**Source channel (Discord):** ${bug.sourceChannelId}`);
   if (bug.reporters.length) {
     parts.push(`**Reported by (Discord user IDs):** ${bug.reporters.join(', ')}`);
   }

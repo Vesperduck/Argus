@@ -37,6 +37,8 @@ jobs:
           # Named ARGUS_GITHUB_REPO because Actions forbids GITHUB_-prefixed var names.
           ARGUS_GITHUB_REPO: ${{ vars.ARGUS_GITHUB_REPO }}
           DISCORD_SOURCE_CHANNEL_ID: ${{ vars.DISCORD_SOURCE_CHANNEL_ID }}
+          # Comma-separated list; takes precedence over DISCORD_SOURCE_CHANNEL_ID.
+          DISCORD_SOURCE_CHANNEL_IDS: ${{ vars.DISCORD_SOURCE_CHANNEL_IDS }}
           DISCORD_REVIEW_CHANNEL_ID: ${{ vars.DISCORD_REVIEW_CHANNEL_ID }}
           ARGUS_MODEL: ${{ vars.ARGUS_MODEL }}
           ARGUS_REQUIRE_APPROVAL: ${{ vars.ARGUS_REQUIRE_APPROVAL }}
