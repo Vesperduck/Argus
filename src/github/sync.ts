@@ -45,6 +45,27 @@ function renderIssueBody(bug: BugReport): string {
     parts.push(...bug.stepsToReproduce.map((s, i) => `${i + 1}. ${s}`));
   }
 
+  if (bug.sourceMessages?.length) {
+    parts.push('');
+    parts.push('## Original reports');
+    parts.push('<sub>Verbatim Discord messages this bug was distilled from.</sub>');
+    for (const m of bug.sourceMessages) {
+      parts.push('');
+      parts.push(`**${m.authorName}** — <sub>${m.createdAt}</sub>`);
+      const quoted = m.content.trim()
+        ? m.content
+            .trim()
+            .split('\n')
+            .map((l) => `> ${l}`)
+            .join('\n')
+        : '> _(no text)_';
+      parts.push(quoted);
+      if (m.attachments?.length) {
+        parts.push(`> 📎 ${m.attachments.map((a) => a.url).join(' , ')}`);
+      }
+    }
+  }
+
   parts.push('');
   parts.push(`**Severity:** ${bug.severity}`);
   if (bug.area) parts.push(`**Area:** ${bug.area}`);

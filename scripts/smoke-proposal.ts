@@ -42,8 +42,8 @@ if (mode === 'read') {
     process.exit(1);
   }
   const proposal = { discordMessageId: messageId, bug: { reporters: [] } } as unknown as Proposal;
-  const verdict = await readProposalReactions(rest, config, proposal);
-  console.log('reactions (bot excluded):', verdict);
+  const { verdict, channelId } = await readProposalReactions(rest, config, proposal);
+  console.log(`reactions (bot excluded, found in channel ${channelId}):`, verdict);
 } else {
   const bug: BugReport = {
     title: '[Argus test] proposal — safe to delete',
@@ -52,6 +52,15 @@ if (mode === 'read') {
     stepsToReproduce: ['Open the squad roster', 'Remove a guard', 'Observe the blank entry'],
     severity: 'low',
     sourceMessageIds: ['smoke-1'],
+    sourceMessages: [
+      {
+        id: 'smoke-1',
+        authorId: '000000000000000000',
+        authorName: 'smoke-tester',
+        createdAt: new Date().toISOString(),
+        content: 'Removing a guard from the roster leaves a blank entry behind.',
+      },
+    ],
     reporters: [],
   };
   await postProposalsHeader(rest, config);

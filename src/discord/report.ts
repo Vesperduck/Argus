@@ -119,12 +119,21 @@ export async function postProposal(
   const steps = bug.stepsToReproduce?.length
     ? `**Steps to reproduce:**\n${bug.stepsToReproduce.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
     : '';
+  const sources = bug.sourceMessages?.length
+    ? `**Original messages:**\n${truncate(
+        bug.sourceMessages
+          .map((m) => `> **${m.authorName}:** ${m.content.replace(/\s+/g, ' ').trim() || '_(no text)_'}`)
+          .join('\n'),
+        700,
+      )}`
+    : '';
   const content = truncate(
     [
       `🐛 **Proposed bug report** — \`${bug.severity}\``,
       `**${bug.title}**`,
       bug.summary,
       steps,
+      sources,
       actionLine(action),
       mentions ? `Reporters: ${mentions}` : '',
       `React ${APPROVE} to confirm and I'll file it, or ${REJECT} to dismiss.`,

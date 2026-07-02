@@ -53,6 +53,28 @@ function renderMessages(messages: RawMessage[]): string {
 }
 
 /**
+ * Attach the verbatim source messages to a bug by looking up each of Claude's
+ * sourceMessageIds in the ingested set. Ids with no matching message (rare) are
+ * skipped. This gives downstream consumers (proposal card, GitHub issue) the
+ * actual text without a second Discord fetch.
+ */
+function enrichSources(bug: BugReport, messages: RawMessage[]): BugReport {
+  const byId = new Map(messages.map((m) => [m.id, m]));
+  const sourceMessages = bug.sourceMessageIds
+    .map((id) => byId.get(id))
+    .filter((m): m is RawMessage => m !== undefined)
+    .map((m) => ({
+      id: m.id,
+      authorId: m.authorId,
+      authorName: m.authorName,
+      createdAt: m.createdAt,
+      content: m.content,
+      ...(m.attachments.length ? { attachments: m.attachments } : {}),
+    }));
+  return { ...bug, sourceMessages };
+}
+
+/**
  * Cluster raw messages into distinct bug reports via Claude with structured
  * outputs. Streams the request (large input/output), validates the result with
  * BugListSchema, and records token usage/cost.
@@ -95,7 +117,7 @@ export async function clusterMessages(
 
   try {
     const parsed = BugListSchema.parse(JSON.parse(text));
-    return parsed.bugs;
+    return parsed.bugs.map((bug) => enrichSources(bug, messages));
   } catch (err) {
     logger.error(
       'failed to parse clustering output',

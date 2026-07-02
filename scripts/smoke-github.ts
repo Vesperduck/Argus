@@ -36,6 +36,15 @@ const bug: BugReport = {
   severity: 'low',
   area: 'test',
   sourceMessageIds: ['smoke-msg-1', 'smoke-msg-2'],
+  sourceMessages: [
+    {
+      id: 'smoke-msg-1',
+      authorId: '000000000000000000',
+      authorName: 'smoke-tester',
+      createdAt: new Date().toISOString(),
+      content: 'The roster shows a blank entry after removing a guard.',
+    },
+  ],
   reporters: ['000000000000000000'],
 };
 

@@ -5,6 +5,23 @@ import { z } from 'zod';
  * model's JSON ourselves rather than relying on the SDK's zod-v4-based
  * `zodOutputFormat` helper, so the project stays on a single zod version.
  */
+const SourceMessageSchema = z.object({
+  id: z.string(),
+  authorId: z.string(),
+  authorName: z.string(),
+  createdAt: z.string(),
+  content: z.string(),
+  attachments: z
+    .array(
+      z.object({
+        url: z.string(),
+        filename: z.string(),
+        contentType: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
 export const BugReportSchema = z.object({
   title: z.string(),
   summary: z.string(),
@@ -13,6 +30,10 @@ export const BugReportSchema = z.object({
   severity: z.enum(['low', 'medium', 'high', 'critical', 'unknown']),
   area: z.string().optional(),
   sourceMessageIds: z.array(z.string()),
+  // Enriched by the orchestrator after Claude returns (the model only supplies
+  // sourceMessageIds); defaults to [] so both model output and legacy state
+  // parse cleanly.
+  sourceMessages: z.array(SourceMessageSchema).default([]),
   reporters: z.array(z.string()),
 });
 

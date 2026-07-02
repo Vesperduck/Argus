@@ -24,6 +24,19 @@ export interface RawMessage {
   replyToId?: string;
 }
 
+/**
+ * A verbatim source message folded into a bug, captured at cluster time so a
+ * developer resolving the bug can see exactly what was said (not just an id).
+ */
+export interface SourceMessage {
+  id: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string; // ISO 8601
+  content: string;
+  attachments?: MessageAttachment[];
+}
+
 /** A single distinct bug, distilled by Claude from one or more messages. */
 export interface BugReport {
   title: string;
@@ -32,7 +45,10 @@ export interface BugReport {
   stepsToReproduce?: string[];
   severity: BugSeverity;
   area?: string;
+  // Kept for the fingerprint/dedup system (issue markers key off these ids).
   sourceMessageIds: string[];
+  // The verbatim messages behind those ids, for developer context on resolution.
+  sourceMessages: SourceMessage[];
   reporters: string[]; // Discord user IDs
 }
 

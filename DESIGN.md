@@ -119,6 +119,14 @@ schema via the SDK's `zodOutputFormat` helper), and streaming.
 messages about the same underlying bug merged into one report. Schema fields: `title`, `summary`,
 `description`, `stepsToReproduce`, `severity`, `area`, `sourceMessageIds`, `reporters`.
 
+After the model returns, the orchestrator **enriches each bug with `sourceMessages`** — the verbatim
+Discord messages (author, timestamp, content, attachments) behind those `sourceMessageIds`, looked
+up from the ingested batch. The model only emits the ids (cheaper, and it can't fabricate content);
+Argus attaches the real text. These are persisted on the proposal/state and rendered in both the
+proposal card and the GitHub issue ("Original reports") so a developer resolving the bug sees exactly
+what was said, not just an id. `sourceMessageIds` are retained unchanged because the issue
+fingerprint/dedup marker keys off them.
+
 **(b) Merge judgement.** Input: a new bug + a shortlist of candidate existing issues. Output:
 `{ issueNumber: number | null, newInformation: string }`. Code narrows candidates first; Claude
 makes the semantic call.
